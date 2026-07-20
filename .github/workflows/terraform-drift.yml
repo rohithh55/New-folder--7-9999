@@ -1,0 +1,84 @@
+name: Terraform Drift Detection
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # Every hour
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+
+jobs:
+  drift-detection:
+    name: Terraform Drift Detection
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS Identity
+        run: aws sts get-caller-identity
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Check Terraform Formatting
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Drift Detection
+        id: drift
+        shell: bash
+        run: |
+          terraform plan -detailed-exitcode -no-color -out=tfplan > plan.txt || EXIT_CODE=$?
+
+          if [ "${EXIT_CODE:-0}" -eq 0 ]; then
+            echo "status=No Drift" >> $GITHUB_OUTPUT
+          elif [ "${EXIT_CODE:-0}" -eq 2 ]; then
+            echo "status=Drift Detected" >> $GITHUB_OUTPUT
+          else
+            echo "Terraform Plan Failed"
+            cat plan.txt
+            exit 1
+          fi
+
+      - name: Upload Drift Plan
+        if: steps.drift.outputs.status == 'Drift Detected'
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-drift-plan
+          path: tfplan
+
+      - name: Publish Drift Summary
+        shell: bash
+        run: |
+          echo "# Terraform Drift Detection" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Status" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.drift.outputs.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.drift.outputs.status }}" = "Drift Detected" ]; then
+            echo "## Drift Details" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            terraform show -no-color tfplan | grep '^  #' || true
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Infrastructure matches Terraform state." >> $GITHUB_STEP_SUMMARY
+          fi

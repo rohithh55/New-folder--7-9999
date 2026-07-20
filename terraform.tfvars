@@ -9,7 +9,7 @@ instance_name = "terraform-ec2"
 bucket_name = "rohith-demo-bucket-777701"
 
 environment = "dev"
-vpc_name = "dev-vpc"
+vpc_name    = "dev-vpc"
 
 vpc_cidr = "10.0.0.0/16"
 
