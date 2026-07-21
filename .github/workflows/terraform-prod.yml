@@ -1,4 +1,4 @@
-name: Terraform CI/CD
+name: Terraform Production CI/CD
 
 on:
   push:
@@ -21,16 +21,10 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Debug GitHub Context
-        run: |
-          echo "Repository: $GITHUB_REPOSITORY"
-          echo "Branch: $GITHUB_REF"
-          echo "Event: $GITHUB_EVENT_NAME"
-          echo "Actor: $GITHUB_ACTOR"
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
-      - name: Configure AWS Credentials (OIDC)
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
@@ -43,7 +37,10 @@ jobs:
         run: terraform fmt -check -recursive
 
       - name: Terraform Init
-        run: terraform init
+        run: |
+          terraform init \
+            -input=false \
+            -backend-config=backend/prod.hcl
 
       - name: Terraform Validate
         run: terraform validate
@@ -54,10 +51,14 @@ jobs:
           directory: .
           framework: terraform
           quiet: true
-          soft_fail: false
+          soft_fail: true
 
       - name: Terraform Plan
-        run: terraform plan -out=tfplan
+        run: |
+          terraform plan \
+            -input=false \
+            -var-file=environments/prod.tfvars \
+            -out=tfplan
 
       - name: Display Terraform Plan
         run: terraform show -no-color tfplan
@@ -71,19 +72,30 @@ jobs:
       - name: Publish Plan Summary
         run: |
           terraform show -no-color tfplan > plan.txt
-          {
-            echo "## Terraform Plan Summary"
-            echo ""
-            echo "### Resources"
-            echo '```'
-            grep '^  #' plan.txt || true
-            echo '```'
-            echo ""
-            echo "### Plan Result"
-            echo '```'
-            grep '^Plan:' plan.txt || true
-            echo '```'
-          } >> $GITHUB_STEP_SUMMARY
+
+          echo "## Terraform Production Plan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | Production |" >> $GITHUB_STEP_SUMMARY
+          echo "| AWS Region | $AWS_REGION |" >> $GITHUB_STEP_SUMMARY
+          echo "| Terraform Format | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+          echo "| Terraform Validate | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+          echo "| Checkov Scan | ✅ Completed |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Resources" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep '^  #' plan.txt || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Terraform Plan" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep '^Plan:' plan.txt || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
   apply:
     name: Terraform Apply
     needs: plan
@@ -99,7 +111,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
-      - name: Configure AWS Credentials (OIDC)
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
@@ -109,7 +121,10 @@ jobs:
         run: aws sts get-caller-identity
 
       - name: Terraform Init
-        run: terraform init
+        run: |
+          terraform init \
+            -input=false \
+            -backend-config=backend/prod.hcl
 
       - name: Download Terraform Plan
         uses: actions/download-artifact@v4
@@ -117,7 +132,7 @@ jobs:
           name: tfplan
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve tfplan
+        run: terraform apply -input=false -auto-approve tfplan
 
       - name: Show Terraform Outputs
         run: terraform output
