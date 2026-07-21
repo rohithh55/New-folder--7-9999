@@ -81,4 +81,4 @@ jobs:
             echo '```' >> $GITHUB_STEP_SUMMARY
           else
             echo "Infrastructure matches Terraform state." >> $GITHUB_STEP_SUMMARY
-          fi
+          fi  
