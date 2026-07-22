@@ -1,5 +1,4 @@
 resource "aws_s3_bucket" "bucket" {
-
   bucket = var.bucket_name
 
   tags = {
@@ -13,7 +12,6 @@ resource "aws_s3_bucket" "bucket" {
 #############################
 
 resource "aws_s3_bucket_versioning" "versioning" {
-
   bucket = aws_s3_bucket.bucket.id
 
   versioning_configuration {
@@ -22,7 +20,7 @@ resource "aws_s3_bucket_versioning" "versioning" {
 }
 
 #############################
-# Server Side Encryption
+# KMS Key
 #############################
 
 resource "aws_kms_key" "s3" {
@@ -36,9 +34,11 @@ resource "aws_kms_key" "s3" {
       {
         Sid    = "EnableRootPermissions"
         Effect = "Allow"
+
         Principal = {
           AWS = "arn:aws:iam::522814728916:root"
         }
+
         Action   = "kms:*"
         Resource = "*"
       }
@@ -47,18 +47,33 @@ resource "aws_kms_key" "s3" {
 }
 
 #############################
+# S3 Default Encryption
+#############################
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "encryption" {
+  bucket = aws_s3_bucket.bucket.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      kms_master_key_id = aws_kms_key.s3.arn
+      sse_algorithm     = "aws:kms"
+    }
+
+    bucket_key_enabled = true
+  }
+}
+
+#############################
 # Public Access Block
 #############################
 
 resource "aws_s3_bucket_public_access_block" "public_access" {
-
   bucket = aws_s3_bucket.bucket.id
 
   block_public_acls       = true
   ignore_public_acls      = true
   block_public_policy     = true
   restrict_public_buckets = true
-
 }
 
 #############################
@@ -66,7 +81,6 @@ resource "aws_s3_bucket_public_access_block" "public_access" {
 #############################
 
 resource "aws_s3_bucket_lifecycle_configuration" "lifecycle" {
-
   bucket = aws_s3_bucket.bucket.id
 
   rule {
@@ -80,13 +94,5 @@ resource "aws_s3_bucket_lifecycle_configuration" "lifecycle" {
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
     }
-  }
-
-}
-resource "aws_s3_bucket" "logs" {
-  bucket = "${var.bucket_name}-logs"
-
-  tags = {
-    Name = "${var.bucket_name}-logs"
   }
 }
