@@ -66,17 +66,17 @@ resource "aws_s3_bucket_lifecycle_configuration" "lifecycle" {
   bucket = aws_s3_bucket.bucket.id
 
   rule {
-  id     = "cleanup"
-  status = "Enabled"
+    id     = "cleanup"
+    status = "Enabled"
 
-  expiration {
-    days = 365
-  }
+    expiration {
+      days = 365
+    }
 
-  abort_incomplete_multipart_upload {
-    days_after_initiation = 7
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
   }
-}
 
 }
 resource "aws_s3_bucket" "logs" {
