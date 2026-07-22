@@ -34,8 +34,8 @@ resource "aws_kms_key" "s3" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid       = "EnableRootPermissions"
-        Effect    = "Allow"
+        Sid    = "EnableRootPermissions"
+        Effect = "Allow"
         Principal = {
           AWS = "arn:aws:iam::522814728916:root"
         }
