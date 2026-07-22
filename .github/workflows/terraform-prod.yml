@@ -1,4 +1,4 @@
-name: Terraform  prod CI/CD
+name: Terraform Prod CI/CD
 
 on:
   push:
@@ -21,16 +21,10 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Debug GitHub Context
-        run: |
-          echo "Repository: $GITHUB_REPOSITORY"
-          echo "Branch: $GITHUB_REF"
-          echo "Event: $GITHUB_EVENT_NAME"
-          echo "Actor: $GITHUB_ACTOR"
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
-      - name: Configure AWS Credentials (OIDC)
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
@@ -39,16 +33,18 @@ jobs:
       - name: Verify AWS Identity
         run: aws sts get-caller-identity
 
-      - name: Terraform Format Check
+      - name: Terraform Format
         run: terraform fmt -check -recursive
 
       - name: Terraform Init
-        run: terraform init
+        run: |
+          terraform init \
+            -backend-config=backend/prod.hcl
 
       - name: Terraform Validate
         run: terraform validate
 
-      - name: Run Checkov Security Scan
+      - name: Checkov Security Scan
         uses: bridgecrewio/checkov-action@v12
         with:
           directory: .
@@ -57,12 +53,15 @@ jobs:
           soft_fail: false
 
       - name: Terraform Plan
-        run: terraform plan -out=tfplan
+        run: |
+          terraform plan \
+            -var-file=environments/prod.tfvars \
+            -out=tfplan
 
-      - name: Display Terraform Plan
+      - name: Show Terraform Plan
         run: terraform show -no-color tfplan
 
-      - name: Upload Terraform Plan
+      - name: Upload Plan
         uses: actions/upload-artifact@v4
         with:
           name: tfplan
@@ -71,19 +70,17 @@ jobs:
       - name: Publish Plan Summary
         run: |
           terraform show -no-color tfplan > plan.txt
+
           {
-            echo "## Terraform Plan Summary"
+            echo "## Terraform Production Plan"
             echo ""
-            echo "### Resources"
-            echo '```'
-            grep '^  #' plan.txt || true
-            echo '```'
+            echo "**Environment:** Production"
             echo ""
-            echo "### Plan Result"
             echo '```'
             grep '^Plan:' plan.txt || true
             echo '```'
           } >> $GITHUB_STEP_SUMMARY
+
   apply:
     name: Terraform Apply
     needs: plan
@@ -99,7 +96,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
-      - name: Configure AWS Credentials (OIDC)
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
@@ -109,7 +106,9 @@ jobs:
         run: aws sts get-caller-identity
 
       - name: Terraform Init
-        run: terraform init
+        run: |
+          terraform init \
+            -backend-config=backend/prod.hcl
 
       - name: Download Terraform Plan
         uses: actions/download-artifact@v4
@@ -119,5 +118,5 @@ jobs:
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
 
-      - name: Show Terraform Outputs
+      - name: Show Outputs
         run: terraform output

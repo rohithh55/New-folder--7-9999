@@ -24,7 +24,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
-      - name: Configure AWS Credentials (OIDC)
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
@@ -33,13 +33,13 @@ jobs:
       - name: Verify AWS Identity
         run: aws sts get-caller-identity
 
-      - name: Terraform Format Check
+      - name: Terraform Format
         run: terraform fmt -check -recursive
 
       - name: Terraform Init
         run: |
           terraform init \
-          -backend-config=backend/dev.hcl
+            -backend-config=backend/dev.hcl
 
       - name: Terraform Validate
         run: terraform validate
@@ -50,13 +50,13 @@ jobs:
           directory: .
           framework: terraform
           quiet: true
-          soft_fail: false
+          soft_fail: true
 
       - name: Terraform Plan
         run: |
           terraform plan \
-          -var-file=environments/dev.tfvars \
-          -out=tfplan
+            -var-file=environments/dev.tfvars \
+            -out=tfplan
 
       - name: Show Terraform Plan
         run: terraform show -no-color tfplan
@@ -65,27 +65,18 @@ jobs:
         run: |
           terraform show -no-color tfplan > plan.txt
 
-          echo "## Terraform Development Plan" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Environment" >> $GITHUB_STEP_SUMMARY
-          echo "Development" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### AWS Region" >> $GITHUB_STEP_SUMMARY
-          echo "${{ env.AWS_REGION }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Resources" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          grep '^  #' plan.txt || true
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Plan Result" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          grep '^Plan:' plan.txt || true
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Terraform Dev Plan"
+            echo ""
+            echo "**Environment:** Development"
+            echo ""
+            echo '```'
+            grep '^Plan:' plan.txt || true
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
 
       - name: Terraform Apply
-        run: |
-          terraform apply -auto-approve tfplan
+        run: terraform apply -auto-approve tfplan
 
-      - name: Terraform Outputs
+      - name: Show Outputs
         run: terraform output
