@@ -25,20 +25,21 @@ resource "aws_s3_bucket_versioning" "versioning" {
 # Server Side Encryption
 #############################
 
+resource "aws_kms_key" "s3" {
+  description             = "S3 KMS Key"
+  deletion_window_in_days = 7
+}
+
 resource "aws_s3_bucket_server_side_encryption_configuration" "encryption" {
 
   bucket = aws_s3_bucket.bucket.id
 
   rule {
-
     apply_server_side_encryption_by_default {
-
-      sse_algorithm = "AES256"
-
+      kms_master_key_id = aws_kms_key.s3.arn
+      sse_algorithm     = "aws:kms"
     }
-
   }
-
 }
 
 #############################
@@ -65,15 +66,23 @@ resource "aws_s3_bucket_lifecycle_configuration" "lifecycle" {
   bucket = aws_s3_bucket.bucket.id
 
   rule {
+  id     = "cleanup"
+  status = "Enabled"
 
-    id = "cleanup"
-
-    status = "Enabled"
-
-    expiration {
-      days = 365
-    }
-
+  expiration {
+    days = 365
   }
 
+  abort_incomplete_multipart_upload {
+    days_after_initiation = 7
+  }
+}
+
+}
+resource "aws_s3_bucket" "logs" {
+  bucket = "${var.bucket_name}-logs"
+
+  tags = {
+    Name = "${var.bucket_name}-logs"
+  }
 }
