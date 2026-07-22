@@ -1,21 +1,3 @@
-module "vpc" {
-  source = "./modules/vpc"
-
-  vpc_name = var.vpc_name
-  vpc_cidr = var.vpc_cidr
-
-  public_subnets = [
-    var.public_subnet_1_cidr,
-    var.public_subnet_2_cidr
-  ]
-
-  availability_zones = [
-    var.availability_zone_1,
-    var.availability_zone_2
-  ]
-
-  environment = var.environment
-}
 module "ec2" {
   source = "./modules/ec2"
 
