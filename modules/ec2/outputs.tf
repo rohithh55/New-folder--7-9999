@@ -5,3 +5,11 @@ output "instance_id" {
 output "public_ip" {
   value = aws_instance.ec2.public_ip
 }
+
+output "private_ip" {
+  value = aws_instance.ec2.private_ip
+}
+
+output "instance_profile" {
+  value = aws_iam_instance_profile.ec2_profile.name
+}
